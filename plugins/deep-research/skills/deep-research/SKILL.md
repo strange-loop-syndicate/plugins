@@ -10,41 +10,23 @@ description: >
 
 # Deep Research
 
-## Decision Tree
+## STEP 1: Validate This Is a Research Task
 
 ```
 Is this a research task?
 ├─ Simple lookup / 1-2 searches → STOP. Use WebSearch directly.
 ├─ Debugging / code question → STOP. Use standard tools.
-└─ Needs 10+ sources, synthesis, verification → CONTINUE.
-
-Mode Selection (default: standard)
-├─ "quick" / exploration / broad overview
-│   → QUICK: 100+ sources, 10-20 min, Phases 1-4,10
-├─ No qualifier / most requests
-│   → STANDARD: 300+ sources, 30-60 min, All 11 phases [DEFAULT]
-├─ "deep" / critical decision / thorough
-│   → DEEP: 500+ sources, 60-120 min, All 11 phases + iterations
-└─ "ultradeep" / comprehensive review / maximum rigor
-    → ULTRADEEP: 500-1000+ sources, 120-240 min, All 11 + multiple iterations
-
-User said "quick"? → quick
-User said "deep"? → deep
-User said "ultradeep" / "comprehensive"? → ultradeep
-Otherwise → standard
+└─ Needs 10+ sources, synthesis, verification → Go to STEP 2.
 ```
 
-## Interactive Pre-Research Flow
+## STEP 2: Clarify Research Task With User
 
-Before launching the research pipeline, you MUST complete two interactive phases
-with the user: **Clarify** and **Plan & Approve**. Never skip these.
+**DO NOT spawn any agents. DO NOT spawn the orchestrator. DO NOT start research.**
 
-### Phase A: Clarify Research Task
+Your ONLY action in this step is to respond to the user with clarification questions.
+No tool calls. Just a text response with questions.
 
-Ask the user targeted clarification questions to refine the research scope.
-Adapt questions to the topic — skip what's already clear from the query.
-
-**Questions to consider asking (pick 3-5 most relevant):**
+Ask 3-5 of these questions (skip what's already obvious from the query):
 
 1. **Goal**: "What decision or outcome will this research support?"
 2. **Audience**: "Who is the intended audience? (technical, executive, general)"
@@ -55,28 +37,37 @@ Adapt questions to the topic — skip what's already clear from the query.
 7. **Depth vs breadth**: "Prefer comprehensive breadth or deep-dive on key areas?"
 8. **Deliverable**: "Any specific format needs beyond the standard report?"
 
-**Infer what you can** — if the query is clearly technical, don't ask about audience.
-If a time range is stated, don't re-ask. Keep the clarification efficient (1-2 messages).
+Also include your mode recommendation with reasoning:
 
-After clarification, confirm:
-- Refined research question (restate in your words)
-- Mode recommendation with reasoning (quick/standard/deep/ultradeep)
-- Any special focus areas or constraints
+```
+Mode Selection (default: standard)
+├─ "quick" / exploration / broad overview
+│   → QUICK: 100+ sources, 10-20 min
+├─ No qualifier / most requests
+│   → STANDARD: 300+ sources, 30-60 min [DEFAULT]
+├─ "deep" / critical decision / thorough
+│   → DEEP: 500+ sources, 60-120 min
+└─ "ultradeep" / comprehensive review / maximum rigor
+    → ULTRADEEP: 500-1000+ sources, 120-240 min
+```
 
-### Phase B: Generate & Approve Research Plan
+**After sending questions, STOP and WAIT for the user to respond.**
+Do not proceed to Step 3 until the user has answered.
 
-**Step 1: Generate scope**
+## STEP 3: Generate Research Plan
+
+Only after user answers your clarification questions.
 
 Spawn the `deep-research:query-strategist` agent to produce the research scope:
 
 ```
-Task(
+Agent(
   subagent_type="deep-research:query-strategist",
   description="Generate research scope for: [TOPIC]",
   prompt="""
 PHASE: 1 (Scope)
 
-RESEARCH QUESTION: [refined question from Phase A]
+RESEARCH QUESTION: [refined question based on user's answers]
 
 CONTEXT FROM USER:
 - Goal: [from clarification]
@@ -94,16 +85,19 @@ Create the evidence/ directory and generate evidence/scope.json with:
 - 5-7 stakeholder perspectives
 - 3-5 competing hypotheses
 - Inclusion/exclusion criteria
-
-Also output a human-readable summary of the scope to stdout.
 """
 )
 ```
 
-**Step 2: Present plan to user**
+Topic name extraction: strip special characters, use CamelCase or underscores.
+- "psilocybin research 2025" → Psilocybin_Research_20260314
+- "compare React vs Vue" → React_vs_Vue_Research_20260314
+- "AI safety trends" → AI_Safety_Trends_Research_20260314
+
+## STEP 4: Present Plan and Get Approval
 
 After the query-strategist completes, read `evidence/scope.json` and present
-the research plan to the user in a clear, readable format:
+the research plan to the user in this format:
 
 ```markdown
 ## Research Plan: [Topic]
@@ -134,26 +128,24 @@ the research plan to the user in a clear, readable format:
 **Estimated time:** [time range for mode]
 ```
 
-**Step 3: Get approval**
+Then ask: **"Does this research plan look good? You can: approve as-is, adjust
+sub-questions, modify hypotheses, change mode, or refine scope."**
 
-Ask the user: "Does this research plan look good? You can:"
-- Approve as-is
-- Adjust sub-questions (add/remove/reprioritize)
-- Modify hypotheses
-- Change mode (quick/standard/deep/ultradeep)
-- Refine scope boundaries
+**STOP and WAIT for user approval. Do not proceed to Step 5 until the user approves.**
 
 If the user requests changes, update `evidence/scope.json` accordingly
-(re-run query-strategist or edit directly for minor changes).
+(re-run query-strategist or edit directly for minor changes), present the
+updated plan, and ask for approval again.
 
-### Phase C: Launch Research
+## STEP 5: Launch Research
 
-Only after user approval, spawn the orchestrator:
+**Only after the user explicitly approves the plan**, spawn the orchestrator:
 
 ```
-Task(
+Agent(
   subagent_type="deep-research:research-orchestrator",
   description="Deep research: [RESEARCH_QUESTION]",
+  run_in_background=true,
   prompt="""
 RESEARCH QUESTION: [refined question]
 
@@ -188,11 +180,6 @@ QUALITY GATES:
 """
 )
 ```
-
-Topic name extraction: strip special characters, use CamelCase or underscores.
-- "psilocybin research 2025" → Psilocybin_Research_20260314
-- "compare React vs Vue" → React_vs_Vue_Research_20260314
-- "AI safety trends" → AI_Safety_Trends_Research_20260314
 
 ## Output Contract
 
