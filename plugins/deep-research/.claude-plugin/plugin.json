@@ -1,6 +1,6 @@
 {
   "name": "deep-research",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "World-class deep research with 500+ sources, structured evidence management, competing hypothesis analysis (ACH), and Admiralty Code source ratings. LLM agents handle all analysis; scripts handle data ops only.",
   "author": {
     "name": "Oleg Ovsyannikov",
