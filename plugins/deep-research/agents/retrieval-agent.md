@@ -29,30 +29,22 @@ You will receive:
 For each query in your assigned list:
 
 1. Run the WebSearch tool with the query
-2. Log the search:
+2. Log the search — you MUST run this bash command for each query:
    ```bash
-   python3 {scripts_path}/evidence_store.py log-search \
-     --folder {research_folder} \
+   python3 {scripts_path}/evidence_store.py log-search {research_folder} \
      --query "{query}" \
-     --wave {wave} \
-     --sub-question "{sub_question_id}" \
      --results-count {number_of_results} \
-     --status completed
+     --wave {wave}
    ```
 
 ### Step 2: Process Results
 
-For each search result:
+For each search result, you MUST run the add-source command via Bash.
+The evidence store uses file locking, so it is safe to run in parallel with other agents.
 
-1. Check if the URL is a duplicate:
+1. Add to evidence store — run this EXACT bash command for each result:
    ```bash
-   python3 {scripts_path}/dedup.py check --folder {research_folder} --url "{url}"
-   ```
-
-2. If not a duplicate, add to evidence store:
-   ```bash
-   python3 {scripts_path}/evidence_store.py add-source \
-     --folder {research_folder} \
+   python3 {scripts_path}/evidence_store.py add-source {research_folder} \
      --url "{url}" \
      --title "{title}" \
      --snippet "{snippet}" \
@@ -61,7 +53,15 @@ For each search result:
      --wave {wave}
    ```
 
-3. Note the returned source ID for your report.
+   The command handles deduplication internally. If the URL already exists,
+   it prints the existing source ID and does not create a duplicate.
+
+2. Note the returned source ID for your report.
+
+**CRITICAL:** You MUST actually execute each `add-source` command via the Bash tool.
+Do NOT just plan to run them or describe what you would run. Each source must be
+stored by running the actual bash command. If you skip the bash calls, the sources
+will not be in the evidence store and the research will have gaps.
 
 ### Step 3: Extract Intelligence from Results
 
@@ -83,9 +83,27 @@ As you process results, collect:
 - Perspectives or stakeholder views missing
 - Time periods not covered
 
-### Step 4: Report
+### Step 4: Verify Your Work
 
-After completing all searches, produce a structured report:
+After completing all searches, verify sources were actually stored:
+
+```bash
+python3 {scripts_path}/evidence_store.py stats --folder {research_folder}
+```
+
+Check that `sources_total` reflects the sources you added.
+
+### Step 5: Report
+
+**Save your report file** to `{research_folder}/evidence/waves/` (create dir if needed):
+
+```bash
+mkdir -p {research_folder}/evidence/waves
+```
+
+Write the report to: `{research_folder}/evidence/waves/wave{wave}_{sub_question_slug}.md`
+
+Report format:
 
 ```
 ## Retrieval Report: {sub_question_id}
@@ -121,6 +139,9 @@ After completing all searches, produce a structured report:
 ### Recommended Follow-up Queries
 - "{query}" — to address {gap}
 ```
+
+**IMPORTANT:** You MUST save the report file before finishing. The orchestrator
+reads wave reports from `evidence/waves/` to plan subsequent waves.
 
 ## Source Type Classification
 

@@ -75,28 +75,38 @@ For each source, evaluate based on available information:
 
 ## Evidence Store CLI
 
-Use this CLI to update ratings:
-
-```bash
-python3 scripts/evidence_store.py update-rating \
-  --folder <research_folder_path> \
-  --source-id <source_id> \
-  --reliability <A-F> \
-  --credibility <1-6> \
-  --bias-flags '<comma-separated flags or empty>' \
-  --rationale '<1-2 sentence explanation>'
-```
+You will receive `scripts_path` and `research_folder` in your prompt.
+Use these EXACT commands (replace placeholders):
 
 To get unrated sources:
-
 ```bash
-python3 scripts/evidence_store.py get-unrated --folder <research_folder_path>
+python3 {scripts_path}/evidence_store.py get-unrated {research_folder}
+```
+
+To update a single source's rating — you MUST run this for EVERY source:
+```bash
+python3 {scripts_path}/evidence_store.py update-rating {research_folder} \
+  --source-id "s_XXXXXXXXXXXX" \
+  --reliability "C" \
+  --credibility 3 \
+  --bias-flags '["vendor_self_promotion"]' \
+  --rationale "Trade publication with specific product data"
+```
+
+To check progress:
+```bash
+python3 {scripts_path}/evidence_store.py stats --folder {research_folder}
 ```
 
 ## Execution Protocol
 
-1. Run `get-unrated` to get the list of sources needing ratings
-2. Process sources in batches of 20-50
+**CRITICAL: You MUST execute each `update-rating` bash command individually.**
+Do NOT skip the bash calls. Do NOT try to modify sources.json directly.
+Do NOT batch ratings in memory and write them at the end. The CLI uses file
+locking to prevent data corruption — always use the CLI.
+
+1. Run `get-unrated` to get the JSON of sources needing ratings
+2. Process sources in batches of 20-30
 3. For each source:
    a. Identify the publisher from the URL/title
    b. Recall what you know about this publisher's reputation and track record
@@ -105,8 +115,11 @@ python3 scripts/evidence_store.py get-unrated --folder <research_folder_path>
    e. Assign credibility grade (1-6)
    f. Note any bias flags
    g. Write a 1-2 sentence rationale
-   h. Call `update-rating` with the assessment
-4. After completing the batch, report summary statistics:
+   h. **Run the `update-rating` bash command** — actually execute it, verify it prints `{"status": "ok"}`
+4. After each batch of 20-30, run `stats` to verify your progress:
+   - Check that `sources_rated` is increasing
+   - If `sources_rated` is still 0 after a batch, your commands are not executing — fix this
+5. After completing ALL sources, run final `stats` and report:
    - Total rated
    - Distribution by reliability (count per grade)
    - Distribution by credibility (count per grade)

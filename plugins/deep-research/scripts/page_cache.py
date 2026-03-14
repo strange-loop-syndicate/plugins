@@ -6,16 +6,43 @@ Uses urllib for HTTP fetching with Jina Reader API as fallback.
 """
 
 import argparse
+import fcntl
 import json
 import os
 import re
 import sys
+import time
+from contextlib import contextmanager
 from html.parser import HTMLParser
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 # Allow importing from same directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+_LOCK_TIMEOUT = 30
+_LOCK_RETRY_INTERVAL = 0.1
+
+
+@contextmanager
+def _file_lock(path):
+    """Acquire exclusive advisory lock for concurrent write safety."""
+    lock_path = path + ".lock"
+    deadline = time.monotonic() + _LOCK_TIMEOUT
+    lock_fd = open(lock_path, "w")
+    try:
+        while True:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except (IOError, OSError):
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"Lock timeout on {lock_path}")
+                time.sleep(_LOCK_RETRY_INTERVAL)
+        yield
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
 
 MAX_CONTENT_SIZE = 50 * 1024  # 50KB
 USER_AGENT = "Mozilla/5.0 (compatible; ResearchBot/1.0)"
@@ -134,27 +161,28 @@ def cmd_fetch(args):
         except (URLError, HTTPError, OSError, ValueError) as e2:
             error = f"Direct: {e}; Jina: {e2}"
 
-    # Update sources.json
-    if os.path.exists(sources_path):
-        sources = _read_json(sources_path)
-    else:
-        sources = {}
-
     if content:
         content = _truncate(content)
         with open(page_file, "w", encoding="utf-8") as f:
             f.write(content)
 
-        if args.source_id in sources:
-            sources[args.source_id]["page_cached"] = True
-            sources[args.source_id]["page_file"] = rel_page_file
-            _write_json(sources_path, sources)
+        # Update sources.json under lock (other agents may be writing concurrently)
+        if os.path.exists(sources_path):
+            with _file_lock(sources_path):
+                sources = _read_json(sources_path)
+                if args.source_id in sources:
+                    sources[args.source_id]["page_cached"] = True
+                    sources[args.source_id]["page_file"] = rel_page_file
+                    _write_json(sources_path, sources)
 
         print(json.dumps({"status": "ok", "source_id": args.source_id, "page_file": rel_page_file, "size": len(content)}))
     else:
-        if args.source_id in sources:
-            sources[args.source_id]["page_cached"] = False
-            _write_json(sources_path, sources)
+        if os.path.exists(sources_path):
+            with _file_lock(sources_path):
+                sources = _read_json(sources_path)
+                if args.source_id in sources:
+                    sources[args.source_id]["page_cached"] = False
+                    _write_json(sources_path, sources)
 
         print(json.dumps({"status": "error", "source_id": args.source_id, "error": error}), file=sys.stderr)
         sys.exit(1)

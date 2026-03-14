@@ -4,21 +4,58 @@
 Stdlib only. No external packages.
 Each command reads/writes only the file it needs.
 Atomic writes via tmp file + os.rename.
+File locking via fcntl.flock to prevent concurrent write races.
 """
 
 import argparse
+import fcntl
 import json
 import os
 import sys
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 # Allow importing dedup from same directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dedup import normalize_url, url_hash
 
+# Lock retry settings for concurrent agent access
+_LOCK_TIMEOUT = 30  # seconds
+_LOCK_RETRY_INTERVAL = 0.1  # seconds
+
 
 def _evidence_dir(folder: str) -> str:
     return os.path.join(folder, "evidence")
+
+
+@contextmanager
+def _file_lock(path: str):
+    """Acquire an exclusive advisory lock on a .lock file for the given path.
+
+    Uses fcntl.flock for process-level mutual exclusion. This prevents
+    read-modify-write races when multiple agents call evidence_store.py
+    concurrently (e.g., 5-10 retrieval agents adding sources in parallel).
+    """
+    lock_path = path + ".lock"
+    deadline = time.monotonic() + _LOCK_TIMEOUT
+    lock_fd = open(lock_path, "w")
+    try:
+        while True:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except (IOError, OSError):
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        f"Could not acquire lock on {lock_path} within {_LOCK_TIMEOUT}s. "
+                        f"Another process may be stalled. Remove {lock_path} if stale."
+                    )
+                time.sleep(_LOCK_RETRY_INTERVAL)
+        yield
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
 
 
 def _read_json(path: str) -> dict | list:
@@ -33,6 +70,19 @@ def _write_json(path: str, data) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
     os.rename(tmp_path, path)
+
+
+def _locked_read_modify_write(path: str, modify_fn):
+    """Read JSON, apply modify_fn, write back — all under file lock.
+
+    modify_fn receives the parsed data and must return (data, result).
+    result is returned to the caller.
+    """
+    with _file_lock(path):
+        data = _read_json(path)
+        data, result = modify_fn(data)
+        _write_json(path, data)
+    return result
 
 
 def _now_iso() -> str:
@@ -64,149 +114,148 @@ def cmd_init(args):
 
 
 def cmd_add_source(args):
-    """Add a source to sources.json with dedup by URL hash."""
+    """Add a source to sources.json with dedup by URL hash. File-locked."""
     path = os.path.join(_evidence_dir(args.folder), "sources.json")
-    sources = _read_json(path)
-
     sid = "s_" + url_hash(args.url)
 
-    if sid in sources:
-        # Already exists — print id but don't duplicate
-        print(sid)
-        return
+    def _modify(sources):
+        if sid in sources:
+            return sources, "duplicate"
 
-    source = {
-        "url": args.url,
-        "title": args.title,
-        "snippet": args.snippet,
-        "source_type": args.source_type or "unknown",
-        "wave": args.wave if args.wave is not None else 1,
-        "search_query": args.search_query or "",
-        "publication_date": args.publication_date or "",
-        "authors": json.loads(args.authors) if args.authors else [],
-        "retrieved_at": _now_iso(),
-        "page_cached": False,
-        "page_file": None,
-        "rating": None,
-    }
+        sources[sid] = {
+            "url": args.url,
+            "title": args.title,
+            "snippet": args.snippet,
+            "source_type": args.source_type or "unknown",
+            "wave": args.wave if args.wave is not None else 1,
+            "search_query": args.search_query or "",
+            "publication_date": args.publication_date or "",
+            "authors": json.loads(args.authors) if args.authors else [],
+            "retrieved_at": _now_iso(),
+            "page_cached": False,
+            "page_file": None,
+            "rating": None,
+        }
+        return sources, "added"
 
-    sources[sid] = source
-    _write_json(path, sources)
+    result = _locked_read_modify_write(path, _modify)
     print(sid)
 
 
 def cmd_update_rating(args):
-    """Update source rating."""
+    """Update source rating. File-locked."""
     path = os.path.join(_evidence_dir(args.folder), "sources.json")
-    sources = _read_json(path)
-
-    if args.source_id not in sources:
-        print(json.dumps({"error": f"Source {args.source_id} not found"}), file=sys.stderr)
-        sys.exit(1)
-
     bias_flags = json.loads(args.bias_flags) if args.bias_flags else []
 
-    sources[args.source_id]["rating"] = {
-        "reliability": args.reliability,
-        "credibility": args.credibility,
-        "bias_flags": bias_flags,
-        "rationale": args.rationale or "",
-        "rated_by": "source-evaluator agent",
-    }
+    def _modify(sources):
+        if args.source_id not in sources:
+            print(json.dumps({"error": f"Source {args.source_id} not found"}), file=sys.stderr)
+            sys.exit(1)
 
-    _write_json(path, sources)
+        sources[args.source_id]["rating"] = {
+            "reliability": args.reliability,
+            "credibility": args.credibility,
+            "bias_flags": bias_flags,
+            "rationale": args.rationale or "",
+            "rated_by": "source-evaluator agent",
+            "rated_at": _now_iso(),
+        }
+        return sources, "ok"
+
+    _locked_read_modify_write(path, _modify)
     print(json.dumps({"status": "ok", "source_id": args.source_id}))
 
 
 def cmd_add_claim(args):
-    """Add a claim to claims.json."""
+    """Add a claim to claims.json. File-locked."""
     path = os.path.join(_evidence_dir(args.folder), "claims.json")
-    claims = _read_json(path)
-
-    # Sequential ID
-    if claims:
-        max_num = max(int(k.split("_")[1]) for k in claims)
-        next_num = max_num + 1
-    else:
-        next_num = 1
-
-    cid = f"c_{next_num:04d}"
-
     source_ids = json.loads(args.source_ids) if args.source_ids else []
 
-    claim = {
-        "text": args.text,
-        "category": args.category or "general",
-        "supporting_source_ids": source_ids,
-        "contradicting_source_ids": [],
-        "confidence": args.confidence or "medium",
-        "verification_status": "unverified",
-    }
+    def _modify(claims):
+        if claims:
+            max_num = max(int(k.split("_")[1]) for k in claims)
+            next_num = max_num + 1
+        else:
+            next_num = 1
 
-    claims[cid] = claim
-    _write_json(path, claims)
+        cid = f"c_{next_num:04d}"
+
+        claims[cid] = {
+            "text": args.text,
+            "category": args.category or "general",
+            "supporting_source_ids": source_ids,
+            "contradicting_source_ids": [],
+            "confidence": args.confidence or "medium",
+            "verification_status": "unverified",
+        }
+        return claims, cid
+
+    cid = _locked_read_modify_write(path, _modify)
     print(cid)
 
 
 def cmd_add_hypothesis(args):
-    """Add a hypothesis to hypotheses.json."""
+    """Add a hypothesis to hypotheses.json. File-locked."""
     path = os.path.join(_evidence_dir(args.folder), "hypotheses.json")
-    hypotheses = _read_json(path)
 
-    if hypotheses:
-        max_num = max(int(k.split("_")[1]) for k in hypotheses)
-        next_num = max_num + 1
-    else:
-        next_num = 1
+    def _modify(hypotheses):
+        if hypotheses:
+            max_num = max(int(k.split("_")[1]) for k in hypotheses)
+            next_num = max_num + 1
+        else:
+            next_num = 1
 
-    hid = f"h_{next_num:03d}"
+        hid = f"h_{next_num:03d}"
 
-    hypothesis = {
-        "text": args.text,
-        "status": "active",
-        "evidence_assessments": {},
-        "assumptions": [],
-    }
+        hypotheses[hid] = {
+            "text": args.text,
+            "status": "active",
+            "evidence_assessments": {},
+            "assumptions": [],
+        }
+        return hypotheses, hid
 
-    hypotheses[hid] = hypothesis
-    _write_json(path, hypotheses)
+    hid = _locked_read_modify_write(path, _modify)
     print(hid)
 
 
 def cmd_update_assessment(args):
-    """Update ACH assessment for a hypothesis-claim pair."""
+    """Update ACH assessment for a hypothesis-claim pair. File-locked."""
     path = os.path.join(_evidence_dir(args.folder), "hypotheses.json")
-    hypotheses = _read_json(path)
-
-    if args.hypothesis_id not in hypotheses:
-        print(json.dumps({"error": f"Hypothesis {args.hypothesis_id} not found"}), file=sys.stderr)
-        sys.exit(1)
 
     valid = {"consistent", "inconsistent", "neutral"}
     if args.assessment not in valid:
         print(json.dumps({"error": f"Assessment must be one of {valid}"}), file=sys.stderr)
         sys.exit(1)
 
-    hypotheses[args.hypothesis_id]["evidence_assessments"][args.claim_id] = args.assessment
-    _write_json(path, hypotheses)
+    def _modify(hypotheses):
+        if args.hypothesis_id not in hypotheses:
+            print(json.dumps({"error": f"Hypothesis {args.hypothesis_id} not found"}), file=sys.stderr)
+            sys.exit(1)
+
+        hypotheses[args.hypothesis_id]["evidence_assessments"][args.claim_id] = args.assessment
+        return hypotheses, "ok"
+
+    _locked_read_modify_write(path, _modify)
     print(json.dumps({"status": "ok", "hypothesis_id": args.hypothesis_id, "claim_id": args.claim_id}))
 
 
 def cmd_log_search(args):
-    """Append a search entry to search_log.json."""
+    """Append a search entry to search_log.json. File-locked."""
     path = os.path.join(_evidence_dir(args.folder), "search_log.json")
-    log = _read_json(path)
 
-    entry = {
-        "query": args.query,
-        "results_count": args.results_count,
-        "wave": args.wave,
-        "timestamp": _now_iso(),
-    }
+    def _modify(log):
+        entry = {
+            "query": args.query,
+            "results_count": args.results_count,
+            "wave": args.wave,
+            "timestamp": _now_iso(),
+        }
+        log.append(entry)
+        return log, len(log)
 
-    log.append(entry)
-    _write_json(path, log)
-    print(json.dumps({"status": "ok", "entries": len(log)}))
+    count = _locked_read_modify_write(path, _modify)
+    print(json.dumps({"status": "ok", "entries": count}))
 
 
 def cmd_get_unrated(args):

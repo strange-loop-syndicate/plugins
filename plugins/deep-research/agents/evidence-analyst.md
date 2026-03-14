@@ -112,47 +112,61 @@ Assign confidence to each claim:
 
 ## Evidence Store CLI
 
-Add claims:
+You will receive `scripts_path` and `research_folder` in your prompt.
+Use these EXACT commands (replace placeholders):
 
+Add a claim — run this for EACH extracted claim:
 ```bash
-python3 scripts/evidence_store.py add-claim \
-  --folder <research_folder_path> \
-  --text "<claim text>" \
-  --category "<category>" \
-  --source-ids "<comma-separated source IDs>" \
-  --confidence "<high|moderate|low|very_low>"
+python3 {scripts_path}/evidence_store.py add-claim {research_folder} \
+  --text "CLAIM TEXT HERE" \
+  --source-ids '["s_abc123", "s_def456"]' \
+  --category "research_finding" \
+  --confidence "moderate"
 ```
 
-Update ACH assessments:
+Note: `--source-ids` takes a JSON array string, not comma-separated values.
 
+Update ACH assessment — run for each claim-hypothesis pair:
 ```bash
-python3 scripts/evidence_store.py update-assessment \
-  --folder <research_folder_path> \
-  --hypothesis-id "<h_id>" \
-  --claim-id "<c_id>" \
-  --assessment "<consistent|inconsistent|neutral>"
+python3 {scripts_path}/evidence_store.py update-assessment {research_folder} \
+  --hypothesis-id "h_001" \
+  --claim-id "c_0001" \
+  --assessment "consistent"
+```
+
+Check progress:
+```bash
+python3 {scripts_path}/evidence_store.py stats --folder {research_folder}
 ```
 
 Get uncorroborated claims:
-
 ```bash
-python3 scripts/evidence_store.py get-uncorroborated \
-  --folder <research_folder_path> \
-  --min-sources 3
+python3 {scripts_path}/evidence_store.py get-uncorroborated {research_folder} --min-sources 3
 ```
 
 ## Execution Protocol
 
-1. Read `evidence/scope.json` to load hypotheses
-2. List all cached pages in `evidence/pages/`
+**CRITICAL: You MUST execute each `add-claim` and `update-assessment` bash command.**
+Do NOT write to claims.json or hypotheses.json directly. The CLI uses file locking.
+
+1. Read `{research_folder}/evidence/scope.json` to load hypotheses
+2. List all cached pages in `{research_folder}/evidence/pages/`
 3. For each page:
    a. Read the content
-   b. Extract factual claims
-   c. Add each claim via `add-claim`
-4. After all claims extracted:
-   a. Build the ACH matrix: for each claim, assess against each hypothesis via `update-assessment`
-   b. Work ACROSS (one claim against all hypotheses) not DOWN (all claims against one hypothesis)
-5. Identify and report:
+   b. Extract factual claims (3-10 per source)
+   c. **Run the `add-claim` bash command** for each claim — verify it returns a claim ID
+4. After all claims extracted, verify:
+   ```bash
+   python3 {scripts_path}/evidence_store.py stats --folder {research_folder}
+   # claims_total should be > 0
+   ```
+5. Build ACH matrix: for each claim, assess against each hypothesis via `update-assessment`
+   - Work ACROSS (one claim against all hypotheses) not DOWN (all claims against one hypothesis)
+6. Write analysis artifacts:
+   - Triangulation summary to: `{research_folder}/evidence/triangulation.md`
+   - ACH matrix to: `{research_folder}/evidence/ach_matrix.md`
+   - Full analysis to: `{research_folder}/evidence/ANALYSIS.md`
+7. Run final stats and report:
    - Total claims extracted
    - Claims by confidence level
    - Non-diagnostic evidence (consistent with all hypotheses)
