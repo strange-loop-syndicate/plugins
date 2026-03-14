@@ -34,40 +34,151 @@ User said "ultradeep" / "comprehensive"? → ultradeep
 Otherwise → standard
 ```
 
-## Autonomy Principle
+## Interactive Pre-Research Flow
 
-Proceed without asking. Default to standard mode. Infer scope, audience, and
-time period from query context. Only stop if the query is incomprehensible or
-contains contradictory requirements.
+Before launching the research pipeline, you MUST complete two interactive phases
+with the user: **Clarify** and **Plan & Approve**. Never skip these.
 
-Default assumptions:
-- Technical query → technical audience
-- Comparison → balanced perspective
-- Trend query → recent 1-2 years unless specified
-- No mode specified → standard
+### Phase A: Clarify Research Task
 
-## Orchestrator Invocation
+Ask the user targeted clarification questions to refine the research scope.
+Adapt questions to the topic — skip what's already clear from the query.
 
-Spawn the `deep-research:research-orchestrator` agent with the following context:
+**Questions to consider asking (pick 3-5 most relevant):**
+
+1. **Goal**: "What decision or outcome will this research support?"
+2. **Audience**: "Who is the intended audience? (technical, executive, general)"
+3. **Scope boundaries**: "Any specific aspects to focus on or exclude?"
+4. **Time range**: "What time period? (e.g., last 2 years, historical overview)"
+5. **Geographic scope**: "Global or specific regions?"
+6. **Known context**: "What do you already know? Any sources or leads to start from?"
+7. **Depth vs breadth**: "Prefer comprehensive breadth or deep-dive on key areas?"
+8. **Deliverable**: "Any specific format needs beyond the standard report?"
+
+**Infer what you can** — if the query is clearly technical, don't ask about audience.
+If a time range is stated, don't re-ask. Keep the clarification efficient (1-2 messages).
+
+After clarification, confirm:
+- Refined research question (restate in your words)
+- Mode recommendation with reasoning (quick/standard/deep/ultradeep)
+- Any special focus areas or constraints
+
+### Phase B: Generate & Approve Research Plan
+
+**Step 1: Generate scope**
+
+Spawn the `deep-research:query-strategist` agent to produce the research scope:
+
+```
+Task(
+  subagent_type="deep-research:query-strategist",
+  description="Generate research scope for: [TOPIC]",
+  prompt="""
+PHASE: 1 (Scope)
+
+RESEARCH QUESTION: [refined question from Phase A]
+
+CONTEXT FROM USER:
+- Goal: [from clarification]
+- Audience: [from clarification]
+- Scope boundaries: [from clarification]
+- Time range: [from clarification]
+- Known context: [from clarification]
+
+OUTPUT FOLDER: ~/data/skills/deep-research/[TopicName]_Research_[YYYYMMDD]/
+
+SCRIPTS PATH: [plugin_root]/scripts
+
+Create the evidence/ directory and generate evidence/scope.json with:
+- 8-12 MECE sub-questions
+- 5-7 stakeholder perspectives
+- 3-5 competing hypotheses
+- Inclusion/exclusion criteria
+
+Also output a human-readable summary of the scope to stdout.
+"""
+)
+```
+
+**Step 2: Present plan to user**
+
+After the query-strategist completes, read `evidence/scope.json` and present
+the research plan to the user in a clear, readable format:
+
+```markdown
+## Research Plan: [Topic]
+
+**Research Question:** [refined question]
+**Mode:** [mode] ([source target] sources, [time estimate])
+
+### Sub-Questions (MECE Decomposition)
+1. [sq_01] [question] — priority: high
+2. [sq_02] [question] — priority: high
+...
+
+### Competing Hypotheses
+- H1: [hypothesis text]
+- H2: [hypothesis text]
+- H3: [hypothesis text]
+
+### Stakeholder Perspectives
+- [perspective 1]: [who, what they care about]
+- [perspective 2]: [who, what they care about]
+...
+
+### Scope
+- **Time range:** [range]
+- **Geographic:** [scope]
+- **Excluded:** [exclusions]
+
+**Estimated time:** [time range for mode]
+```
+
+**Step 3: Get approval**
+
+Ask the user: "Does this research plan look good? You can:"
+- Approve as-is
+- Adjust sub-questions (add/remove/reprioritize)
+- Modify hypotheses
+- Change mode (quick/standard/deep/ultradeep)
+- Refine scope boundaries
+
+If the user requests changes, update `evidence/scope.json` accordingly
+(re-run query-strategist or edit directly for minor changes).
+
+### Phase C: Launch Research
+
+Only after user approval, spawn the orchestrator:
 
 ```
 Task(
   subagent_type="deep-research:research-orchestrator",
   description="Deep research: [RESEARCH_QUESTION]",
   prompt="""
-RESEARCH QUESTION: [paste user's question verbatim]
+RESEARCH QUESTION: [refined question]
 
-MODE: [quick|standard|deep|ultradeep]
+MODE: [approved mode]
 
 OUTPUT FOLDER: ~/data/skills/deep-research/[TopicName]_Research_[YYYYMMDD]/
 
+SCOPE: PRE-APPROVED
+The scope has been approved by the user. evidence/scope.json already exists
+in the output folder. Skip Phase 1 (SCOPE) and proceed directly to Phase 2 (PLAN).
+
+USER CONTEXT:
+- Goal: [from clarification]
+- Audience: [from clarification]
+- Special focus: [any user-specified focus areas]
+
 INSTRUCTIONS:
-1. Read methodology: ~/.claude/plugins/deep-research/reference/methodology.md
-2. Read report template: ~/.claude/plugins/deep-research/templates/report_template.md
-3. Execute the full pipeline for the selected mode.
-4. Store all evidence in the output folder.
-5. Generate report in MD, HTML, and PDF formats.
-6. Send Telegram notification when complete.
+1. Read methodology: [plugin_root]/reference/methodology.md
+2. Read report template: [plugin_root]/templates/report_template.md
+3. Read the pre-approved scope from evidence/scope.json.
+4. Start from Phase 2 (PLAN) — scope is already approved.
+5. Execute the remaining pipeline for the selected mode.
+6. Store all evidence in the output folder.
+7. Generate report in MD, HTML, and PDF formats.
+8. Send Telegram notification when complete.
 
 QUALITY GATES:
 - Quick: 100+ sources, report 2000+ words
