@@ -16,7 +16,5 @@
     "hypothesis-testing",
     "admiralty-code",
     "multi-agent"
-  ],
-  "agents": "./agents/",
-  "skills": "./skills/"
+  ]
 }
