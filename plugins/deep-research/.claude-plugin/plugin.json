@@ -1,0 +1,22 @@
+{
+  "name": "deep-research",
+  "version": "2.0.0",
+  "description": "World-class deep research with 500+ sources, structured evidence management, competing hypothesis analysis (ACH), and Admiralty Code source ratings. LLM agents handle all analysis; scripts handle data ops only.",
+  "author": {
+    "name": "Oleg Ovsyannikov",
+    "email": "oleg.ovsyannikov@gmail.com"
+  },
+  "homepage": "https://github.com/strange-loop-syndicate/plugins",
+  "repository": "https://github.com/strange-loop-syndicate/plugins",
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "deep-research",
+    "evidence",
+    "hypothesis-testing",
+    "admiralty-code",
+    "multi-agent"
+  ],
+  "agents": "./agents/",
+  "skills": "./skills/"
+}
