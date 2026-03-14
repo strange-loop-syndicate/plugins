@@ -179,9 +179,36 @@ agent failed silently. Re-run the phase.
 
 ---
 
-### Phase 0: Create Research Team
+### Phase 0: Initialize Folder Structure and Create Research Team
 
-Create a team for agents that need back-and-forth communication across phases:
+**First, scaffold the complete output directory.** This prevents agents from writing
+files to wrong locations. Run this BEFORE spawning any agents:
+
+```bash
+mkdir -p {output_folder}/evidence/pages
+mkdir -p {output_folder}/evidence/waves
+python3 {scripts_path}/evidence_store.py init {output_folder}
+```
+
+This creates:
+```
+{output_folder}/
+├── evidence/
+│   ├── sources.json       # ← agents write here via CLI
+│   ├── claims.json        # ← agents write here via CLI
+│   ├── hypotheses.json    # ← agents write here via CLI
+│   ├── scope.json         # ← strategist writes here
+│   ├── search_log.json    # ← agents write here via CLI
+│   ├── pages/             # ← page cache goes here (one .md per source)
+│   └── waves/             # ← retrieval agent wave reports go here
+```
+
+**All agent output files MUST go inside `evidence/`.** The root `{output_folder}/`
+is reserved for the final report files only. If you see wave reports, analysis files,
+or agent outputs appearing in the root directory, something is wrong — move them to
+their correct location inside `evidence/` or `evidence/waves/`.
+
+Now create a team for agents that need back-and-forth communication across phases:
 
 ```
 TeamCreate(
@@ -289,7 +316,14 @@ python3 {scripts_path}/evidence_store.py log-search {output_folder} \
   --results-count NUMBER_OF_RESULTS \
   --wave 1
 
-Save your wave report to: {output_folder}/evidence/waves/wave1_[sub_question_slug].md
+IMPORTANT FILE LOCATIONS (do NOT write files anywhere else):
+- Wave report: {output_folder}/evidence/waves/wave1_[sub_question_slug].md
+- Sources are stored via CLI to: {output_folder}/evidence/sources.json (automatic)
+- Searches are logged via CLI to: {output_folder}/evidence/search_log.json (automatic)
+- Do NOT write files to {output_folder}/ root or {output_folder}/evidence/ directly
+
+Create the waves directory if it doesn't exist:
+mkdir -p {output_folder}/evidence/waves
 """)
 ```
 
@@ -302,6 +336,16 @@ python3 {scripts_path}/evidence_store.py stats --folder {output_folder}
 Wait for ALL Wave 1 agents to complete (check their task status). Then run the
 gate check. If sources_total is below the minimum, investigate: read agent
 reports, check if agents actually ran the bash commands, re-run failing agents.
+
+**File location check after each wave:**
+```bash
+# Verify wave reports are in the correct location
+ls {output_folder}/evidence/waves/wave1_*.md
+# If wave reports ended up in wrong places, move them:
+# mv {output_folder}/wave*.md {output_folder}/evidence/waves/  # root → waves/
+# mv {output_folder}/evidence/wave*.md {output_folder}/evidence/waves/  # evidence/ → waves/
+```
+If agents wrote reports to wrong locations, move them and note this for future runs.
 
 **Wave 2: Terminology Refinement** (skip in `quick`)
 - Collect wave reports from `{output_folder}/evidence/waves/wave1_*.md`
@@ -325,6 +369,36 @@ python3 {scripts_path}/evidence_store.py stats --folder {output_folder}
 ```
 
 Report: "Retrieval complete. Total: {N} sources across {W} waves."
+
+**Folder structure validation (run after ALL retrieval waves):**
+```bash
+# Check for misplaced files and fix them
+echo "=== Checking file locations ==="
+
+# Wave reports should be in evidence/waves/, not elsewhere
+misplaced_root=$(find {output_folder} -maxdepth 1 -name "wave*.md" 2>/dev/null | wc -l)
+misplaced_evidence=$(find {output_folder}/evidence -maxdepth 1 -name "wave*.md" 2>/dev/null | wc -l)
+correct=$(find {output_folder}/evidence/waves -name "wave*.md" 2>/dev/null | wc -l)
+
+echo "Wave reports: $correct in evidence/waves/ (correct), $misplaced_root in root (WRONG), $misplaced_evidence in evidence/ (WRONG)"
+
+# Fix misplaced files
+if [ "$misplaced_root" -gt 0 ]; then
+  mv {output_folder}/wave*.md {output_folder}/evidence/waves/ 2>/dev/null
+  echo "Moved $misplaced_root files from root → evidence/waves/"
+fi
+if [ "$misplaced_evidence" -gt 0 ]; then
+  mv {output_folder}/evidence/wave*.md {output_folder}/evidence/waves/ 2>/dev/null
+  echo "Moved $misplaced_evidence files from evidence/ → evidence/waves/"
+fi
+
+# Verify expected structure
+echo "=== Folder structure ==="
+find {output_folder} -type f -name "*.md" -o -name "*.json" | sort
+```
+
+If files are consistently ending up in the wrong place, check the agent spawn prompts —
+the `IMPORTANT FILE LOCATIONS` block must be present in every retrieval agent prompt.
 
 ### Phase 4: RATE SOURCES
 
