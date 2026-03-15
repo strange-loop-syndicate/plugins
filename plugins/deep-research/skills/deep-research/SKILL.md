@@ -19,37 +19,12 @@ Is this a research task?
 └─ Needs 10+ sources, synthesis, verification → Go to STEP 2.
 ```
 
-## AUTONOMOUS MODE (for background subagent delegation)
-
-When your prompt contains `AUTONOMOUS: true`, you are running as a background
-subagent with no user interaction. The caller MUST also provide:
-
-- **RESEARCH_QUESTION** (required) — the refined research question
-- **MODE** (required, default "standard") — quick / standard / deep / ultradeep
-- **OUTPUT_FOLDER** (required) — full path to research output directory
-
-Optional fields:
-- **CONTEXT** — constraints, audience, geographic scope, time range
-- **ANGLES** — pre-defined sub-questions (list) to use instead of generating new ones
-
-### Autonomous Flow
-
-```
-AUTONOMOUS: true detected?
-├─ Yes → Skip STEP 2 (clarification) entirely
-│        Run STEP 3 (scope generation) normally
-│        Skip STEP 4 (auto-approve scope — no user to ask)
-│        Proceed to STEP 5 (pipeline execution)
-│        Default MODE to "standard" if missing
-└─ No  → Follow normal interactive flow (STEP 2 → STEP 3 → STEP 4 → STEP 5)
-```
-
-**Warning:** Autonomous mode skips all user confirmations. Only use when
-delegating to a background agent via `Agent(run_in_background=true)`.
-
----
-
 ## STEP 2: Clarify Research Task With User
+
+**IMPORTANT: NEVER delegate deep research to a background subagent.** This skill
+requires interactive user collaboration for scoping and approval. If you need
+autonomous background research, spawn a `deep-research:research-agent` instead —
+it runs the full pipeline independently without user interaction.
 
 **DO NOT spawn any agents. DO NOT start research.**
 
@@ -253,8 +228,8 @@ TeamCreate(
 
 ### Team Fallback (when TeamCreate is unavailable)
 
-If you are running in autonomous mode or TeamCreate is not available (background
-subagent context), use the Agent tool to spawn each team role independently:
+If TeamCreate is not available (e.g., tool not loaded, subagent context), use the
+Agent tool to spawn each team role independently:
 
 - Set `team_mode = "agent_fallback"`
 - Replace all `SendMessage(to: "X", ...)` with `Agent(subagent_type="deep-research:X", ...)`
@@ -262,8 +237,6 @@ subagent context), use the Agent tool to spawn each team role independently:
   scripts_path, and any relevant previous phase outputs)
 - The agent should READ files from the evidence store rather than receiving content
   via SendMessage context
-
-In autonomous mode, ALWAYS use agent_fallback — do not attempt TeamCreate.
 
 Architecture:
 ```
