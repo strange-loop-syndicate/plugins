@@ -10,21 +10,39 @@ description: >
 
 # Deep Research
 
-## STEP 1: Validate This Is a Research Task
+## STEP 1: Validate and Route
 
 ```
 Is this a research task?
 ├─ Simple lookup / 1-2 searches → STOP. Use WebSearch directly.
 ├─ Debugging / code question → STOP. Use standard tools.
-└─ Needs 10+ sources, synthesis, verification → Go to STEP 2.
+└─ Needs 10+ sources, synthesis, verification → Choose mode:
+
+Should you orchestrate interactively or delegate?
+├─ User explicitly asks for background/delegated research
+│   ("research X in background", "delegate this research", "run research while I...")
+│   → Spawn `deep-research:research-agent` as background agent. Do NOT use this skill.
+│
+├─ You are orchestrating multiple tasks and need to offload research
+│   (e.g., task manager session running several workstreams in parallel)
+│   → Spawn `deep-research:research-agent` as background agent. Do NOT use this skill.
+│
+├─ User wants to shape the research scope, review the plan, or choose angles
+│   → Continue to Step 2 (interactive deep research). This is the DEFAULT.
+│
+└─ User says "/deep-research", "deep research on X", or "research X" (no delegation signal)
+    → Continue to Step 2 (interactive deep research). This is the DEFAULT.
+
+DEFAULT: Interactive. Only delegate to research-agent when the user explicitly
+asks for background execution or when you are a task orchestrator managing parallel work.
 ```
 
 ## STEP 2: Clarify Research Task With User
 
-**IMPORTANT: NEVER delegate deep research to a background subagent.** This skill
-requires interactive user collaboration for scoping and approval. If you need
-autonomous background research, spawn a `deep-research:research-agent` instead —
-it runs the full pipeline independently without user interaction.
+**If you reached this step, you are orchestrating interactively.** Do NOT delegate
+the remaining steps to a background subagent. Run the full pipeline from this session
+with user visibility into every phase. If you need to delegate instead, go back to
+Step 1 and spawn `deep-research:research-agent`.
 
 **DO NOT spawn any agents. DO NOT start research.**
 
