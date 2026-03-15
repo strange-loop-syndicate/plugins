@@ -19,6 +19,36 @@ Is this a research task?
 └─ Needs 10+ sources, synthesis, verification → Go to STEP 2.
 ```
 
+## AUTONOMOUS MODE (for background subagent delegation)
+
+When your prompt contains `AUTONOMOUS: true`, you are running as a background
+subagent with no user interaction. The caller MUST also provide:
+
+- **RESEARCH_QUESTION** (required) — the refined research question
+- **MODE** (required, default "standard") — quick / standard / deep / ultradeep
+- **OUTPUT_FOLDER** (required) — full path to research output directory
+
+Optional fields:
+- **CONTEXT** — constraints, audience, geographic scope, time range
+- **ANGLES** — pre-defined sub-questions (list) to use instead of generating new ones
+
+### Autonomous Flow
+
+```
+AUTONOMOUS: true detected?
+├─ Yes → Skip STEP 2 (clarification) entirely
+│        Run STEP 3 (scope generation) normally
+│        Skip STEP 4 (auto-approve scope — no user to ask)
+│        Proceed to STEP 5 (pipeline execution)
+│        Default MODE to "standard" if missing
+└─ No  → Follow normal interactive flow (STEP 2 → STEP 3 → STEP 4 → STEP 5)
+```
+
+**Warning:** Autonomous mode skips all user confirmations. Only use when
+delegating to a background agent via `Agent(run_in_background=true)`.
+
+---
+
 ## STEP 2: Clarify Research Task With User
 
 **DO NOT spawn any agents. DO NOT start research.**
@@ -221,6 +251,20 @@ TeamCreate(
 )
 ```
 
+### Team Fallback (when TeamCreate is unavailable)
+
+If you are running in autonomous mode or TeamCreate is not available (background
+subagent context), use the Agent tool to spawn each team role independently:
+
+- Set `team_mode = "agent_fallback"`
+- Replace all `SendMessage(to: "X", ...)` with `Agent(subagent_type="deep-research:X", ...)`
+- Each Agent prompt MUST include full context (research question, output_folder,
+  scripts_path, and any relevant previous phase outputs)
+- The agent should READ files from the evidence store rather than receiving content
+  via SendMessage context
+
+In autonomous mode, ALWAYS use agent_fallback — do not attempt TeamCreate.
+
 Architecture:
 ```
 You (main session — orchestrator)
@@ -258,6 +302,11 @@ RESEARCH FOLDER: {output_folder}
 SCRIPTS PATH: {scripts_path}
 """)
 ```
+
+**Agent fallback** (if `team_mode == "agent_fallback"`):
+Use `Agent(subagent_type="deep-research:query-strategist", ...)` with the same
+instructions as the SendMessage body above, plus: read context from
+`{output_folder}/evidence/scope.json`. Include `RESEARCH FOLDER` and `SCRIPTS PATH`.
 
 **GATE CHECK after Phase 2:**
 ```bash
@@ -352,15 +401,25 @@ If agents wrote reports to wrong locations, move them and note this for future r
 - `SendMessage(to: "strategist")` with Wave 1 results + discovered terms
 - Spawn 3-5 retrieval agents for refined queries (same prompt template as above, wave=2)
 
+**Agent fallback** (if `team_mode == "agent_fallback"`):
+Use `Agent(subagent_type="deep-research:query-strategist", ...)` — same instructions,
+plus: read wave reports from `{output_folder}/evidence/waves/wave1_*.md` for context.
+
 **GATE CHECK after Wave 2:** sources_total should be significantly higher than after Wave 1.
 
 **Wave 3: Citation Chain Following** (skip in `quick`)
 - `SendMessage(to: "strategist")` with top-source citations
 - Spawn 2-3 retrieval agents (wave=3)
 
+**Agent fallback**: Same pattern — `Agent(subagent_type="deep-research:query-strategist", ...)`
+with instructions to read `{output_folder}/evidence/sources.json` for top-rated source citations.
+
 **Wave 4: MECE Gap Filling** (skip in `quick`)
 - `SendMessage(to: "strategist")` with coverage stats
 - Spawn 2-3 retrieval agents (wave=4)
+
+**Agent fallback**: Same pattern — strategist reads evidence stats and scope.json to
+identify coverage gaps, generates targeted queries for wave 4.
 
 **GATE CHECK after all waves:**
 ```bash
@@ -575,6 +634,12 @@ python3 {scripts_path}/evidence_store.py stats --folder {output_folder}
 """)
 ```
 
+**Agent fallback** (if `team_mode == "agent_fallback"`):
+Use `Agent(subagent_type="deep-research:evidence-analyst", ...)` with the same
+instructions as the SendMessage body above. The agent reads context from:
+`{output_folder}/evidence/scope.json`, `{output_folder}/evidence/sources.json`,
+and all files in `{output_folder}/evidence/pages/`.
+
 **GATE CHECK after Phase 5:**
 ```bash
 python3 {scripts_path}/evidence_store.py stats --folder {output_folder}
@@ -615,6 +680,10 @@ Save critique to: {output_folder}/evidence/CRITIQUE.md
 """)
 ```
 
+**Agent fallback** (if `team_mode == "agent_fallback"`):
+Use `Agent(subagent_type="deep-research:critique-agent", ...)` with the same
+instructions. The agent reads synthesis and evidence from `{output_folder}/evidence/`.
+
 Report: "Linchpin assumptions: {N}. Actionable items: {N}."
 
 ### Phase 9: REFINE (skip in `quick`)
@@ -625,6 +694,13 @@ Report: "Linchpin assumptions: {N}. Actionable items: {N}."
 4. `SendMessage(to: "analyst")` to re-analyze with new evidence
 5. **GATE CHECK:** Run stats, verify claims_total increased
 6. Update synthesis if conclusions change
+
+**Agent fallback** (if `team_mode == "agent_fallback"`):
+Replace SendMessage calls in steps 1 and 4 with Agent tool equivalents:
+- Step 1: `Agent(subagent_type="deep-research:query-strategist", ...)` — reads
+  `{output_folder}/evidence/CRITIQUE.md` and stats to generate gap-filling queries.
+- Step 4: `Agent(subagent_type="deep-research:evidence-analyst", ...)` — reads
+  updated sources/pages and re-runs claim extraction + ACH assessment.
 
 ### Phase 10: PACKAGE
 
@@ -722,3 +798,41 @@ Gate check: [PASS/FAIL] — {details}
 - 2 validation failures on same error → pause, report to user
 - **Gate check fails → DO NOT proceed. Diagnose, fix, re-run the phase.**
 - **Agent reports success but spot-check fails → re-run with explicit bash commands**
+
+## Caller Verification Checklist (for delegated research)
+
+When you delegate research to a background subagent, verify outputs after completion.
+
+### Quick Check
+
+```bash
+python3 {scripts_path}/verify_output.py {output_folder} --mode {mode}
+```
+
+Add `--json` for machine-readable output.
+
+### Threshold Reference
+
+| Check | quick | standard | deep | ultradeep |
+|-------|-------|----------|------|-----------|
+| Sources | >= 100 | >= 250 | >= 400 | >= 500 |
+| Rated % | >= 90% | >= 90% | >= 90% | >= 95% |
+| Pages cached | >= 10 | >= 30 | >= 50 | >= 80 |
+| Claims | >= 20 | >= 40 | >= 60 | >= 80 |
+| Hypotheses | >= 3 | >= 3 | >= 3 | >= 5 |
+| Report words | >= 2000 | >= 4000 | >= 6000 | >= 10000 |
+
+### Additional Manual Checks
+
+1. **Analysis artifacts**: `triangulation.md`, `ach_matrix.md`, `CRITIQUE.md` in `evidence/`
+2. **Wave reports**: at least 1 file in `evidence/waves/`
+3. **Pages not empty**: `find {output_folder}/evidence/pages/ -name "*.md" -size 0 | wc -l` should be 0
+4. **Report quality**: open the report, check for placeholder text, missing citations, or stub sections
+
+### If Checks Fail
+
+- **Source count low**: research agent likely failed to run retrieval waves. Re-run with explicit wave instructions.
+- **0 pages cached**: WebFetch or page_cache.py calls were skipped. Re-run Phase 4.5.
+- **0 claims**: evidence analyst did not execute bash commands. Re-run Phase 5 with spot-check enforcement.
+- **Missing artifacts**: agent wrote files to wrong location. Check root folder and `evidence/` for misplaced files.
+- **Report too short**: synthesis was incomplete. Re-run Phases 7 + 10.
