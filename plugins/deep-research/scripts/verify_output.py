@@ -4,7 +4,7 @@
 Standalone stdlib-only script. Exit code 0 = all checks pass, 1 = one or more fail.
 
 Usage:
-    python3 verify_output.py <folder> --mode <quick|standard|deep|ultradeep> [--json]
+    python3 verify_output.py <folder> --mode <quick|standard|deep|ultradeep> [--json] [--pre-report]
 """
 
 import argparse
@@ -198,6 +198,12 @@ def main():
         dest="json_output",
         help="Output results as JSON",
     )
+    parser.add_argument(
+        "--pre-report",
+        action="store_true",
+        dest="pre_report",
+        help="Pre-report checkpoint mode: only check pipeline prerequisites, assertive output",
+    )
     args = parser.parse_args()
 
     folder = os.path.expanduser(args.folder)
@@ -206,28 +212,88 @@ def main():
         sys.exit(1)
 
     results = run_checks(folder, args.mode)
-    overall_pass = all(passed for _, passed, _ in results)
 
-    if args.json_output:
-        output = {
-            "folder": folder,
-            "mode": args.mode,
-            "overall": "PASS" if overall_pass else "FAIL",
-            "checks": [
-                {"name": name, "status": "PASS" if passed else "FAIL", "detail": detail}
-                for name, passed, detail in results
-            ],
+    # In pre-report mode, only check pipeline prerequisites (not report itself)
+    PRE_REPORT_CHECKS = {
+        "source_count", "rated_pct", "pages_cached", "pages_non_empty",
+        "claims_count", "artifact_triangulation.md", "artifact_ach_matrix.md",
+        "artifact_CRITIQUE.md",
+    }
+
+    if args.pre_report:
+        filtered = [(n, p, d) for n, p, d in results if n in PRE_REPORT_CHECKS]
+        overall_pass = all(p for _, p, _ in filtered)
+
+        # Map check names to phase remediation instructions
+        phase_map = {
+            "source_count": "Run more retrieval waves (Phase 3)",
+            "rated_pct": "Re-run source evaluator (Phase 4)",
+            "pages_cached": "Fetch more pages with WebFetch (Phase 4.5)",
+            "pages_non_empty": "Re-fetch empty pages with WebFetch (Phase 4.5)",
+            "claims_count": "Run Phase 5 — extract claims from cached pages via CLI",
+            "artifact_triangulation.md": "Run Phase 5 — write triangulation.md",
+            "artifact_ach_matrix.md": "Run Phase 5 — write ach_matrix.md",
+            "artifact_CRITIQUE.md": "Run Phase 8 — write CRITIQUE.md",
         }
-        print(json.dumps(output, indent=2))
+
+        if args.json_output:
+            output = {
+                "folder": folder,
+                "mode": args.mode,
+                "checkpoint": "pre-report",
+                "overall": "PASS" if overall_pass else "BLOCKED",
+                "checks": [
+                    {
+                        "name": name,
+                        "status": "PASS" if passed else "BLOCKED",
+                        "detail": detail,
+                        "action": None if passed else phase_map.get(name, ""),
+                    }
+                    for name, passed, detail in filtered
+                ],
+            }
+            print(json.dumps(output, indent=2))
+        else:
+            print(f"Pre-Report Checkpoint — mode: {args.mode}")
+            print(f"Folder: {folder}")
+            print("=" * 60)
+            for name, passed, detail in filtered:
+                if passed:
+                    print(f"  [PASS] {name}: {detail}")
+                else:
+                    action = phase_map.get(name, "")
+                    print(f"  [BLOCKED] {name}: {detail}")
+                    print(f"            -> {action}")
+            print("=" * 60)
+            if overall_pass:
+                print("Checkpoint: PASS — proceed to Phase 10 (report writing)")
+            else:
+                blocked = sum(1 for _, p, _ in filtered if not p)
+                print(f"Checkpoint: BLOCKED — {blocked} check(s) failed. "
+                      f"Complete the phases above before writing the report.")
     else:
-        print(f"Deep Research Output Verification — mode: {args.mode}")
-        print(f"Folder: {folder}")
-        print("-" * 60)
-        for name, passed, detail in results:
-            status = "PASS" if passed else "FAIL"
-            print(f"  [{status}] {name}: {detail}")
-        print("-" * 60)
-        print(f"Overall: {'PASS' if overall_pass else 'FAIL'}")
+        overall_pass = all(passed for _, passed, _ in results)
+
+        if args.json_output:
+            output = {
+                "folder": folder,
+                "mode": args.mode,
+                "overall": "PASS" if overall_pass else "FAIL",
+                "checks": [
+                    {"name": name, "status": "PASS" if passed else "FAIL", "detail": detail}
+                    for name, passed, detail in results
+                ],
+            }
+            print(json.dumps(output, indent=2))
+        else:
+            print(f"Deep Research Output Verification — mode: {args.mode}")
+            print(f"Folder: {folder}")
+            print("-" * 60)
+            for name, passed, detail in results:
+                status = "PASS" if passed else "FAIL"
+                print(f"  [{status}] {name}: {detail}")
+            print("-" * 60)
+            print(f"Overall: {'PASS' if overall_pass else 'FAIL'}")
 
     sys.exit(0 if overall_pass else 1)
 

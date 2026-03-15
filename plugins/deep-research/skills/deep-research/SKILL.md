@@ -521,6 +521,9 @@ Report: "Sources rated: {N}/{total}. A-B: {N}, C: {N}, D-F: {N}."
 
 ### Phase 4.5: FETCH TOP SOURCES
 
+**THIS PHASE IS NOT OPTIONAL.** Do not skip it because "wave reports have enough data"
+or "there are too many sources." Cache at least the mode minimum number of pages.
+
 Cache full page content for A-C rated sources. This phase uses two approaches:
 
 **Approach 1 (Preferred): WebFetch tool — you do this yourself**
@@ -570,6 +573,17 @@ sites. Prefer WebFetch for better success rates.
 **Prioritization:** Cache A and B sources first, then C sources. Skip D-F sources.
 If a fetch fails, log it and continue — do not block the pipeline.
 
+**Batch approach (for large source counts):**
+
+If there are more than 50 A-C sources, prioritize:
+1. ALL A-rated sources (fetch every one)
+2. B-rated sources until you reach the mode minimum for cached pages
+3. C-rated sources only if still below minimum
+
+Do NOT skip page caching because there are "too many" sources. The mode minimums
+exist precisely to set a reasonable target. Fetch at least the minimum, prioritize
+by rating.
+
 **GATE CHECK after Phase 4.5:**
 ```bash
 python3 {scripts_path}/evidence_store.py stats --folder {output_folder}
@@ -585,6 +599,10 @@ find {output_folder}/evidence/pages/ -name "*.md" -size 0 -o -name "*.md" -size 
 Report: "Pages cached: {N}. Empty pages: {M} (re-fetch if > 0)."
 
 ### Phase 5: TRIANGULATE
+
+**THIS PHASE IS NOT OPTIONAL.** Claims MUST be extracted via the CLI and stored in
+claims.json. Reading wave reports and "knowing the data" is not the same as structured
+claim extraction with source linkage.
 
 **PREREQUISITE CHECK:** Before starting this phase, confirm:
 1. `sources_rated` >= 90% of `sources_total` (from Phase 4 gate)
@@ -692,6 +710,30 @@ Replace SendMessage calls in steps 1 and 4 with Agent tool equivalents:
   `{output_folder}/evidence/CRITIQUE.md` and stats to generate gap-filling queries.
 - Step 4: `Agent(subagent_type="deep-research:evidence-analyst", ...)` — reads
   updated sources/pages and re-runs claim extraction + ACH assessment.
+
+### Pre-Report Checkpoint (MANDATORY — Phase 10 BLOCKED until this passes)
+
+Before writing ANY part of the report, you MUST run this checkpoint:
+
+```bash
+python3 {scripts_path}/verify_output.py {output_folder} --mode {mode} --pre-report
+```
+
+If the checkpoint FAILS, you MUST go back and complete the failing phases:
+- `source_count` below target → Run more retrieval waves
+- `rated_pct` below 90% → Re-run source evaluator
+- `pages_cached` below minimum → Fetch more pages (Phase 4.5)
+- `claims_count` below minimum → Run Phase 5 (triangulation) — extract claims from cached pages
+- Missing `triangulation.md` → Run Phase 5
+- Missing `ach_matrix.md` → Run Phase 5
+- Missing `CRITIQUE.md` → Run Phase 8
+
+**DO NOT rationalize skipping phases.** "Wave reports contain enough data" is NOT
+an acceptable reason to skip claim extraction. "Too many sources to fetch" is NOT
+an acceptable reason to skip page caching. The phase gate minimums are the standard —
+meet them or document why in the report's limitations section.
+
+**DO NOT write the report until this checkpoint passes.**
 
 ### Phase 10: PACKAGE
 

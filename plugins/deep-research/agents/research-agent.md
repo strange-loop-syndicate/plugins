@@ -202,6 +202,9 @@ Agent(
 
 ### Phase 4.5: Fetch Top Sources
 
+**THIS PHASE IS NOT OPTIONAL.** Do not skip it because "wave reports have enough data"
+or "there are too many sources." Cache at least the mode minimum number of pages.
+
 Get A-C rated sources via `get-by-rating`. For each, use WebFetch to get page content:
 
 ```bash
@@ -232,10 +235,18 @@ lock_fd.close()
 
 Prioritize A and B sources first, then C. Skip D-F. If a fetch fails, log and continue.
 
+**Batch approach (for large source counts):** If there are more than 50 A-C sources,
+fetch ALL A-rated, then B-rated until you reach the mode minimum, then C-rated only
+if still below minimum. Do NOT skip because there are "too many" sources.
+
 **GATE CHECK:** `sources_cached >= [mode minimum]`
 Verify no empty pages: `find {output_folder}/evidence/pages/ -name "*.md" -size 0 | wc -l`
 
 ### Phase 5: Triangulate
+
+**THIS PHASE IS NOT OPTIONAL.** Claims MUST be extracted via the CLI and stored in
+claims.json. Reading wave reports and "knowing the data" is not the same as structured
+claim extraction with source linkage.
 
 Read all cached pages from `evidence/pages/`. For each page, extract 3-10 factual claims.
 
@@ -280,6 +291,21 @@ Write critique to `{output_folder}/evidence/CRITIQUE.md`.
 4. Re-read new pages, extract additional claims, update ACH matrix
 5. **GATE CHECK:** claims_total increased
 6. Update synthesis if conclusions change
+
+### Pre-Report Checkpoint (MANDATORY — Phase 10 BLOCKED until this passes)
+
+Before writing ANY part of the report, run:
+
+```bash
+python3 {scripts_path}/verify_output.py {output_folder} --mode {mode} --pre-report
+```
+
+If it FAILS, go back and complete the failing phases. Do NOT rationalize skipping
+phases. "Wave reports contain enough data" is NOT an acceptable reason to skip claim
+extraction. "Too many sources to fetch" is NOT an acceptable reason to skip page
+caching. Meet the phase gate minimums or document why in the report's limitations.
+
+**DO NOT write the report until this checkpoint passes.**
 
 ### Phase 10: Package
 
