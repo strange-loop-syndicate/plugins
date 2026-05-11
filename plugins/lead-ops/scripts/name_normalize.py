@@ -190,7 +190,7 @@ def match_layered(
     a: str | dict,
     b: str | dict,
     layer: str,
-    fuzzy_threshold: float = 0.88,
+    fuzzy_threshold: float = 0.92,
 ) -> bool:
     """Layered match between two records or name strings.
 

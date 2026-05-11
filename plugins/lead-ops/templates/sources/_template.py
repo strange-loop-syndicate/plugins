@@ -39,9 +39,28 @@ Conventions:
 
 from __future__ import annotations
 
+import argparse
+import json
+import sys
 from typing import Any
 
 
 def discover(scope: dict[str, Any], params: dict[str, Any]) -> list[dict[str, Any]]:
     """Return a list of candidate dicts. See module docstring for contract."""
     raise NotImplementedError("custom source modules must implement discover(scope, params)")
+
+
+def _main() -> int:
+    """CLI entry: `python -m <module> --scope <json> --params <json>` prints JSON to stdout."""
+    parser = argparse.ArgumentParser(description="Run discover() and print candidates as JSON.")
+    parser.add_argument("--scope", default="{}", help="JSON-encoded scope dict")
+    parser.add_argument("--params", required=True, help="JSON-encoded params dict")
+    args = parser.parse_args()
+    candidates = discover(json.loads(args.scope), json.loads(args.params))
+    json.dump(candidates, sys.stdout, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

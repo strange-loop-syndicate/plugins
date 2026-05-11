@@ -24,7 +24,12 @@ DOL/KOL identification (the original use case), B2B SaaS prospecting, journalist
 - **Pluggable templates** for source modules (PubMed, web search, web scrape, ClinicalTrials.gov), working surfaces (Google Sheets, CSV, local JSON), and outreach channels (LinkedIn note, cold email, Twitter DM)
 - **Single project config** (`lead-ops.config.yaml`) defines scope, sources, schema, scoring rules, working surface, outreach channels, audit settings
 
-## Quickstart in Claude Code
+## Quickstart
+
+- **Using lead-ops in Claude Code** — see below
+- **Using lead-ops in Claude Cowork** — see [`docs/USING-IN-CLAUDE-COWORK.md`](docs/USING-IN-CLAUDE-COWORK.md)
+
+### Claude Code
 
 **1. Install from the marketplace.**
 
