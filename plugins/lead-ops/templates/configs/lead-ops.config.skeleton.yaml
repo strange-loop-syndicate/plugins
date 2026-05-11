@@ -1,0 +1,81 @@
+# lead-ops config skeleton.
+# Copy to your project root as ./lead-ops.config.yaml and fill in the blanks.
+# Run /lead-ops:plan to be guided through populating each section interactively.
+
+# ---- project ----------------------------------------------------------------
+project:
+  name: ""                            # short project name, e.g. "r2h-dol"
+  description: ""                     # one-line description
+  domain: ""                          # the substantive domain, e.g. "oncology EA"
+  owner_email: ""                     # used to resolve OAuth creds path
+
+# ---- scope ------------------------------------------------------------------
+scope:
+  geography: []                       # e.g. ["US primary", "global supplemental"]
+  time_range: ""                      # e.g. "2010+"
+  success_criteria: ""                # plain-English win condition
+  custom: {}                          # free-form project-specific fields
+
+# ---- sources ----------------------------------------------------------------
+# Paste blocks from templates/sources/<id>/config_snippet.yaml here.
+sources: []
+
+# ---- lead schema ------------------------------------------------------------
+schema:
+  # Always-present fields. The build skill expects these to exist on every lead.
+  core_fields:
+    - name
+    - title
+    - institution
+    - location
+    - specialty
+    - stance
+    - tier
+    - category
+    - priority
+    - domain_relation
+    - evidence
+    - notes
+  # Domain-specific extensions. Use {name, type, values?, description}.
+  custom_fields: []
+
+# ---- relevance filter -------------------------------------------------------
+relevance:
+  keep_criteria: ""                   # plain-English KEEP rule for relevance-filter agent
+  remove_criteria: ""                 # plain-English REMOVE rule
+
+# ---- scoring ----------------------------------------------------------------
+# Expressions evaluated by scripts/priority_score.py. First match wins.
+# Bare identifiers refer to lead fields; helpers: evidence_count(), has(field),
+# any_of(value, [...]), len(...), and convenience aliases `reachable` and `quotable`.
+scoring:
+  priorities:
+    A: ""
+    B: ""
+    C: ""
+    D: ""
+  overrides:
+    X: "do_not_approach or competitor"
+
+# ---- working surface --------------------------------------------------------
+# Paste a block from templates/surfaces/<id>/config_snippet.yaml here.
+working_surface:
+  type: local_json
+  config:
+    file_path: "./leads.json"
+
+# ---- external data sources --------------------------------------------------
+# Optional. CSV / XLSX / JSON files the external-cross-ref agent can pull from.
+external_data: []
+
+# ---- outreach ---------------------------------------------------------------
+# Paste blocks from templates/channels/<channel>.yaml or reference by id only
+# (the build skill loads defaults from the plugin templates dir).
+outreach:
+  channels: []
+
+# ---- audit ------------------------------------------------------------------
+audit:
+  checkpoint_interval: 20             # judgment-work checkpoint cadence
+  require_user_approval: true         # stop-and-wait at every checkpoint
+  qa_sample_pct: 0.05                 # qa-auditor random sample size

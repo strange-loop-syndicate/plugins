@@ -17,6 +17,17 @@
       },
       "source": "./plugins/deep-research",
       "category": "productivity"
+    },
+    {
+      "name": "lead-ops",
+      "description": "Evidence-first, domain-agnostic lead research and outreach pipeline. Scope → build (discover/enrich/score/audit/export) → execute (outreach). Verifiable fetched-URL evidence per lead, mandatory audit checkpoints, pluggable sources and working surfaces.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Oleg Ovsyannikov",
+        "email": "oleg.ovsyannikov@gmail.com"
+      },
+      "source": "./plugins/lead-ops",
+      "category": "productivity"
     }
   ]
 }

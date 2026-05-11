@@ -1,0 +1,73 @@
+# Cold email channel.
+# Paste under `outreach.channels:` in lead-ops.config.yaml.
+# Body length is the constraint that matters; subject line is short by convention.
+
+id: cold_email
+max_chars: 800                        # body cap; subject line counted separately
+tone: "specific, respectful, low-friction"
+
+# Placeholders filled per lead by the outreach-writer agent:
+#   {subject}        subject line, <=70 chars
+#   {name}           "Dr. {Surname}" for academics, first name otherwise
+#   {evidence_ref}   one sentence anchoring on the lead's recent work
+#   {intent}         one sentence about why you're reaching out (no product pitch first touch)
+#   {ask}            specific, low-friction ask (15-min call, intro, opinion)
+#   {sender}         sender first name
+#   {sender_role}    short role line (no company name on first touch)
+template: |
+  Subject: {subject}
+
+  Hi {name},
+
+  {evidence_ref}.
+
+  {intent}. {ask}
+
+  Thanks for considering,
+  {sender}
+  {sender_role}
+
+rules:
+  - "MUST keep body under 800 characters (subject excluded)"
+  - "MUST keep subject line under 70 characters"
+  - "MUST reference a specific piece of the lead's published work or role"
+  - "MUST ask for ONE concrete next step (call, intro, written input)"
+  - "MUST NOT pitch a product, attach decks, or list bullet points of features"
+  - "MUST NOT use 'just checking in', 'circling back', or other filler"
+  - "MUST NOT mention sender's company name in first touch"
+  - "MUST NOT use emojis"
+  - "MUST sign with sender first name and a short non-company role descriptor"
+
+example:
+  - persona: "academic (Dr. Caplan, NYU)"
+    rendered: |
+      Subject: NYU CompAC and patient-side EA navigation
+
+      Dr. Caplan,
+
+      Your CompAC work on third-party CU review at NYU is the clearest case I've seen for unbiased EA decisions.
+
+      I'm building on the patient-side of EA access and would value 15 minutes of your perspective on where current pathways fall short for cancer patients.
+
+      Would early next week work for a short call?
+
+      Thanks for considering,
+      Vlad
+      Working on EA access for cancer patients
+    char_count_body: 432
+  - persona: "operator (Adam Jones, Amicus)"
+    rendered: |
+      Subject: Patient-side view of Amicus EA pathways
+
+      Hi Adam,
+
+      Your work running EA programs at Amicus stands out for how patient-centric the framing has stayed across approvals and post-marketing.
+
+      I'm focused on the patient-navigation side of EA and would love to swap notes on what makes a program actually reach the right patients.
+
+      Would a 15-min call next week work?
+
+      Thanks,
+      Vlad
+      Patient-side EA access
+    char_count_body: 419

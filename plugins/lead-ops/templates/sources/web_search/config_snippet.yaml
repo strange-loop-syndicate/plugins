@@ -1,0 +1,17 @@
+# Web search source.
+# Paste this block under `sources:` in lead-ops.config.yaml.
+- id: news_search                       # unique id within your config
+  type: web_search                      # matches templates/sources/web_search/
+  params:
+    # "brave" (requires BRAVE_SEARCH_API_KEY env var) or "duckduckgo" (no key,
+    # rate-limited; suitable only for small batches and dev testing).
+    engine: duckduckgo
+    # Each query is run independently; results are deduped by URL afterward.
+    queries:
+      - "expanded access oncology site:statnews.com 2020..2026"
+      - "compassionate use program oncologist site:ascopost.com"
+      - "right to try policy site:healthaffairs.org"
+    # How many top results to take per query before dedup.
+    max_results_per_query: 10
+    # Sleep between queries to be polite (especially for DDG HTML scrape).
+    request_delay_s: 1.5

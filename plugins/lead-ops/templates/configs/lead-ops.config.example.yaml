@@ -1,0 +1,218 @@
+# lead-ops config example: oncology Expanded Access / Compassionate Use DOLs.
+# Modeled on the T-0130 Right2Hope session that motivated the plugin.
+# Use as a reference for shape and scoring; copy and adapt for your project.
+
+# ---- project ----------------------------------------------------------------
+project:
+  name: "r2h-dol"
+  description: "Doctor/Opinion Leader prospects for Expanded Access outreach"
+  domain: "oncology EA/CU professionals"
+  owner_email: "you@example.com"
+
+# ---- scope ------------------------------------------------------------------
+scope:
+  geography:
+    - "US primary"
+    - "global supplemental"
+  time_range: "2010+"                 # post-modern-EA-era cutoff
+  success_criteria: |
+    Prioritized list of >=500 verifiable oncology-EA professionals with at least
+    one piece of fetched URL-backed evidence and at least one reachable contact
+    channel (LinkedIn 1st/2nd connection OR email).
+  custom:
+    stance_filter_policy: "include critics, flag them as X-priority"
+    evidence_floor: "every lead must have >=1 fetched, persisted source"
+
+# ---- sources ----------------------------------------------------------------
+sources:
+  # Seed PMIDs of canonical EA/CU papers; elink walks the similar-articles graph.
+  - id: pubmed
+    type: pubmed
+    params:
+      seeds:
+        - "29714573"                  # NYU CompAC pilot
+        - "31037620"                  # JAMA EA oncologist survey
+        - "33347319"                  # FDA-IND single-patient EA review
+      title_filter_keywords:
+        - "expanded access"
+        - "compassionate use"
+        - "right to try"
+        - "managed access"
+        - "single patient ind"
+      date_min: 2010
+      date_max: 2026
+      batch_size: 200
+
+  # Conference speaker rosters: high-signal source for active practitioners.
+  - id: conferences
+    type: web_scrape
+    params:
+      pages:
+        - url: "https://operationalize-eap.com/agenda/"
+          link_pattern: "/speaker/[^/]+/?$"
+          base_url: "https://operationalize-eap.com"
+          label: "Operationalise EAP Summit"
+      use_jina: false
+      timeout: 30
+
+  # News articles surface advocates, critics, and policy commentators.
+  - id: news_search
+    type: web_search
+    params:
+      engine: duckduckgo
+      queries:
+        - "expanded access oncology site:statnews.com 2020..2026"
+        - "compassionate use program oncologist site:ascopost.com"
+        - "right to try policy site:healthaffairs.org"
+      max_results_per_query: 10
+      request_delay_s: 1.5
+
+  # ClinicalTrials.gov surfaces principal investigators on active EA studies.
+  - id: clinicaltrials
+    type: clinicaltrials_gov
+    params:
+      query_params:
+        query.cond: "neoplasm OR cancer"
+        query.term: "compassionate use OR expanded access"
+        filter.overallStatus: "AVAILABLE,RECRUITING"
+      only_expanded_access: true
+      max_pages: 5
+      page_size: 100
+
+# ---- lead schema ------------------------------------------------------------
+schema:
+  core_fields:
+    - name
+    - title
+    - institution
+    - location
+    - specialty
+    - stance
+    - tier
+    - category
+    - priority
+    - linkedin_url
+    - linkedin_connection
+    - mutual_connections
+    - key_quote
+    - domain_relation
+    - evidence
+    - notes
+    - do_not_approach
+    - competitor
+    - outreach_sent
+
+  custom_fields:
+    # Renamed from the original session's `ea_relation` to the generic name.
+    - name: domain_relation
+      type: string
+      description: "One sentence summarizing this person's connection to oncology EA/CU."
+
+    - name: category
+      type: enum
+      values:
+        - practicing_oncologist
+        - bioethics_policy
+        - fda_government
+        - biopharma_ea_leader
+        - patient_advocacy
+        - clinical_trial_pi
+        - irb_infrastructure
+        - pharmacist_coordinator
+        - ea_service_company
+      description: "Functional bucket for the person's role in the EA ecosystem."
+
+    - name: stance
+      type: enum
+      values:
+        - strong_advocate
+        - moderate_supporter
+        - neutral_academic
+        - critic
+      description: "Inferred stance toward EA/CU expansion based on published evidence."
+
+    - name: tier
+      type: number
+      description: "1 = first/last author on >=2 papers OR program director OR FDA official; 2 = co-author + speaker; 3 = single weak evidence."
+
+    - name: recency
+      type: string
+      description: "Most recent year evidence was published, e.g. '2024+'."
+
+# ---- relevance filter -------------------------------------------------------
+relevance:
+  keep_criteria: |
+    KEEP if the lead has cancer/oncology evidence relevant to EA/CU, OR if they
+    work on general EA/CU policy (which applies to oncology), OR if they are
+    pharma EA program leaders even when company-wide rather than oncology-only.
+  remove_criteria: |
+    REMOVE when all evidence is non-cancer disease-specific (COVID convalescent
+    plasma, SMA nusinersen, MS ocrelizumab, ALS). REMOVE when the only link is
+    a co-authored PhRMA survey with no EA involvement.
+
+# ---- scoring ----------------------------------------------------------------
+# Expressions are evaluated against each lead by scripts/priority_score.py.
+# First match wins. Overrides run BEFORE priorities so X always trumps A-D.
+scoring:
+  priorities:
+    A: "stance == 'strong_advocate' and tier <= 1 and ev_count >= 2 and (reachable or quotable)"
+    B: "(stance == 'strong_advocate' and tier <= 2 and ev_count >= 1) or (stance == 'moderate_supporter' and tier <= 1 and reachable)"
+    C: "(stance == 'moderate_supporter' and ev_count >= 1) or (tier <= 3 and ev_count >= 1)"
+    D: "ev_count >= 0"
+  overrides:
+    X: "do_not_approach or competitor"
+
+# ---- working surface --------------------------------------------------------
+working_surface:
+  type: google_sheets
+  config:
+    spreadsheet_id: "1JtDLKby7XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    tab: "Database"
+    columns:
+      - name
+      - title
+      - institution
+      - location
+      - specialty
+      - stance
+      - tier
+      - category
+      - priority
+      - linkedin_url
+      - linkedin_connection
+      - mutual_connections
+      - key_quote
+      - domain_relation
+      - evidence
+      - notes
+    oauth_email: "you@example.com"
+
+# ---- external data sources --------------------------------------------------
+external_data:
+  - name: oncologist_db
+    file: "~/data/oncologists.xlsx"
+    match_on:
+      - last_name
+      - first_initial
+      - institution
+    fields_to_pull:
+      - email
+      - phone
+      - city
+      - state
+      - specialty
+
+# ---- outreach ---------------------------------------------------------------
+outreach:
+  channels:
+    - id: linkedin_connection_note    # uses templates/channels/linkedin_connection_note.yaml
+    - id: cold_email
+      template_overrides:
+        tone: "specific, deferential, low-friction (academic-leaning)"
+    - id: twitter_dm
+
+# ---- audit ------------------------------------------------------------------
+audit:
+  checkpoint_interval: 20             # social-enricher + relevance-filter cadence
+  require_user_approval: true
+  qa_sample_pct: 0.05                 # qa-auditor checks 5% of leads

@@ -1,0 +1,33 @@
+# Twitter / X DM channel.
+# Paste under `outreach.channels:` in lead-ops.config.yaml.
+# Tone is lighter than email/LinkedIn; reference a recent tweet, paper, or talk
+# rather than a published-paper deep dive.
+
+id: twitter_dm
+max_chars: 1000                       # X DM limit for non-verified accounts
+tone: "casual, peer-to-peer, specific"
+
+# Placeholders filled per lead by the outreach-writer agent:
+#   {name}           usually first name; Twitter culture is informal
+#   {evidence_ref}   reference to a recent tweet, paper, or talk
+#   {intent}         single sentence on the angle
+#   {sender}         sender first name (or handle without @)
+template: |
+  Hey {name} — {evidence_ref}. {intent}. Would love to swap notes sometime if you're open to it. — {sender}
+
+rules:
+  - "MUST stay under 1000 characters"
+  - "MUST reference something recent (tweet, paper, talk in the last 12 months)"
+  - "MUST stay informal: lowercase 'hey', first-name only, no titles"
+  - "MUST NOT pitch product or include marketing URLs"
+  - "MUST NOT use 'I'm reaching out to you because' or other corporate openers"
+  - "MUST NOT use emojis unless the lead's own recent tweets use them"
+  - "MAY include one short link to a relevant page if it's the most efficient context"
+
+example:
+  - persona: "researcher who recently tweeted a thread on EA"
+    rendered: "Hey Sean — your thread on the gap between EA-eligible vs EA-aware patients hit on something I've been chasing too. Working on patient-side navigation tools and would love to swap notes sometime if you're open to it. — Vlad"
+    char_count: 225
+  - persona: "policy commentator who published a STAT op-ed"
+    rendered: "Hey Alison — read your STAT piece on third-party CU review last week, particularly the bit on conflicts of interest in single-patient INDs. Working on the patient-navigation side of EA and would love to swap notes sometime. — Vlad"
+    char_count: 226
