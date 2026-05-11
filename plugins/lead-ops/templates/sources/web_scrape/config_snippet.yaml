@@ -1,0 +1,20 @@
+# Web scrape source: extract links from listing pages (e.g. conference speakers).
+# Paste this block under `sources:` in lead-ops.config.yaml.
+- id: conferences                       # unique id within your config
+  type: web_scrape                      # matches templates/sources/web_scrape/
+  params:
+    # Each entry fetches one listing page and harvests links matching the
+    # link_pattern regex. Use anchored or distinctive patterns to avoid
+    # picking up nav links or unrelated hrefs.
+    pages:
+      - url: "https://operationalize-eap.com/agenda/"
+        link_pattern: "/speaker/[^/]+/?$"
+        base_url: "https://operationalize-eap.com"
+        label: "Operationalise EAP Summit"
+      - url: "https://www.eapcongress.com/speakers/"
+        link_pattern: "/speaker-profile/"
+        label: "EAP World Congress"
+    # Set true to route every fetch via r.jina.ai (helps with CAPTCHA / JS-only
+    # pages, but adds latency). Off by default.
+    use_jina: false
+    timeout: 30

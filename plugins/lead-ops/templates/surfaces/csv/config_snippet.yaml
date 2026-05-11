@@ -1,0 +1,25 @@
+# CSV working surface.
+# Paste this block under `working_surface:` in lead-ops.config.yaml.
+working_surface:
+  type: csv
+  config:
+    # Output CSV path. Will be created (and parent dirs made) on first upsert.
+    file_path: "./leads.csv"
+    # Column order. Each entry must match a lead field name. If omitted, the
+    # surface falls back to schema.core_fields + schema.custom_fields names.
+    columns:
+      - name
+      - title
+      - institution
+      - location
+      - specialty
+      - stance
+      - tier
+      - category
+      - priority
+      - linkedin_url
+      - linkedin_connection
+      - key_quote
+      - domain_relation
+      - evidence
+      - notes

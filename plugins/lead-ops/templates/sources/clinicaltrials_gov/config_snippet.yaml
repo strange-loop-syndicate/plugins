@@ -1,0 +1,20 @@
+# ClinicalTrials.gov v2 API source.
+# Paste this block under `sources:` in lead-ops.config.yaml.
+- id: clinicaltrials                    # unique id within your config
+  type: clinicaltrials_gov              # matches templates/sources/clinicaltrials_gov/
+  params:
+    # Free-form passthrough to the v2 /studies endpoint. Common useful keys:
+    #   query.term         keyword search across all study fields
+    #   query.cond         disease/condition filter
+    #   filter.advanced    AREA-based filters (study type, phase, status)
+    #   filter.overallStatus  e.g. "AVAILABLE", "RECRUITING"
+    # See https://clinicaltrials.gov/data-api/api for the full vocabulary.
+    query_params:
+      query.cond: "neoplasm OR cancer"
+      query.term: "compassionate use OR expanded access"
+      filter.overallStatus: "AVAILABLE,RECRUITING"
+    # If true, automatically ANDs the studyType=EXPANDED_ACCESS filter.
+    only_expanded_access: true
+    # Pagination guardrail. Stop after this many pages even if more remain.
+    max_pages: 5
+    page_size: 100

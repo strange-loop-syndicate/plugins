@@ -1,0 +1,9 @@
+# Local JSON working surface.
+# Paste this block under `working_surface:` in lead-ops.config.yaml.
+working_surface:
+  type: local_json
+  config:
+    # Output JSON path. Defaults to ./leads.json. Since this surface mirrors
+    # the canonical store anyway, the upsert step is effectively a no-op
+    # rewrite that just normalizes formatting (indent=2 UTF-8).
+    file_path: "./leads.json"

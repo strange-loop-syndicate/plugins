@@ -1,0 +1,31 @@
+# Google Sheets working surface.
+# Paste this block under `working_surface:` in lead-ops.config.yaml.
+working_surface:
+  type: google_sheets
+  config:
+    # The spreadsheet's ID (the long token in its URL between /d/ and /edit).
+    spreadsheet_id: "1JtDLKby7XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    # Tab (sheet) name. Backups capture the full grid regardless.
+    tab: "Database"
+    # Column order on the sheet. Matches lead field names. If omitted, the
+    # surface falls back to schema.core_fields + schema.custom_fields names.
+    columns:
+      - name
+      - title
+      - institution
+      - location
+      - specialty
+      - stance
+      - tier
+      - category
+      - priority
+      - linkedin_url
+      - linkedin_connection
+      - key_quote
+      - domain_relation
+      - evidence
+      - notes
+    # OAuth credentials path. Defaults to
+    # ~/.google_workspace_mcp/credentials/<oauth_email>.json when unset.
+    oauth_email: "you@example.com"
+    # oauth_credentials_path: "~/.google_workspace_mcp/credentials/you.json"

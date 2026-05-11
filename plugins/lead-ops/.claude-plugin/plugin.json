@@ -1,0 +1,22 @@
+{
+  "name": "lead-ops",
+  "version": "0.1.0",
+  "description": "Evidence-first, domain-agnostic lead research and outreach pipeline. Walks user through scope → build (discover/enrich/score/audit/export) → execute (outreach). Every lead carries a verifiable fetched-URL evidence record. LLM agents handle judgment; scripts handle data ops; mandatory audit checkpoints prevent silent drift. Pluggable source modules, working surfaces (Sheets/CSV/JSON), and outreach channels.",
+  "author": {
+    "name": "Oleg Ovsyannikov",
+    "email": "oleg.ovsyannikov@gmail.com"
+  },
+  "homepage": "https://github.com/strange-loop-syndicate/plugins",
+  "repository": "https://github.com/strange-loop-syndicate/plugins",
+  "license": "MIT",
+  "keywords": [
+    "leads",
+    "research",
+    "outreach",
+    "crm",
+    "evidence",
+    "prospecting",
+    "multi-agent",
+    "pipeline"
+  ]
+}

@@ -1,0 +1,20 @@
+# PubMed similar-articles source.
+# Paste this block under `sources:` in lead-ops.config.yaml.
+- id: pubmed                            # unique id within your config
+  type: pubmed                          # matches templates/sources/pubmed/
+  params:
+    # Seeds can be inline PMIDs or a path to a file with one PMID per line.
+    seeds:
+      - "29714573"                      # example: NYU CompAC pilot study
+      - "./seeds/pmids.txt"             # path also accepted (single str)
+    # Title keywords filter (OR-matched, case-insensitive). Leave empty to keep all.
+    title_filter_keywords:
+      - "expanded access"
+      - "compassionate use"
+      - "right to try"
+      - "managed access"
+    # Inclusive year bounds. Omit either to disable that side.
+    date_min: 2010
+    date_max: 2026
+    # esummary batch size (NCBI accepts up to 200 ids per call).
+    batch_size: 200

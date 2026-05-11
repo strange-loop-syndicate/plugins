@@ -1,0 +1,37 @@
+# LinkedIn connection note channel.
+# Paste under `outreach.channels:` in lead-ops.config.yaml, optionally with
+# `template_overrides` to customize wording per project.
+
+id: linkedin_connection_note          # stable channel identifier
+max_chars: 300                        # LinkedIn Premium connection-note limit
+tone: "warm, humble, professional"    # guides the outreach-writer agent
+
+# Jinja-style placeholders the outreach-writer fills per lead:
+#   {name}          recipient first name or "Dr. {Surname}" depending on persona
+#   {evidence_ref}  a 1-sentence reference to the lead's most relevant work
+#   {sender}        sender's first name (NEVER the company name on first touch)
+template: |
+  Hi {name} — {evidence_ref}. I'm working on improving outcomes in this space and would love to learn from your approach. Would love to connect. — {sender}
+
+rules:
+  # Hard MUSTs and MUST-NOTs enforced by the outreach-writer agent.
+  - "MUST stay under 300 characters including spaces and newlines"
+  - "MUST reference a specific piece of the lead's work (paper title, role, talk)"
+  - "MUST use the sender's first name only in the footer"
+  - "MUST match tone to recipient: academic -> 'Dr. {Surname}', advocacy/operator -> first name"
+  - "MUST NOT name the sender's company or product (visible from sender profile)"
+  - "MUST NOT pitch a product, ask for a meeting, or include URLs in first touch"
+  - "MUST NOT use emojis or exclamation marks"
+  - "MUST NOT use generic flattery ('I love your work', 'big fan')"
+
+# Concrete rendered samples to anchor the outreach-writer agent's style.
+example:
+  - persona: "academic bioethicist (Dr. Bateman-House, NYU)"
+    rendered: "Dr. Bateman-House — your NYU CompAC pilot demonstrating third-party CU review is exactly the model I want to learn from. I'm working on improving EA navigation for cancer patients. Would love to connect. — Vlad"
+    char_count: 244
+  - persona: "operator (Debra Ainge, Clinigen)"
+    rendered: "Hi Debra — your work leading Clinigen's managed access programs stands out. I'm building on the patient-side of EA access and would value learning from your operational lens. Would love to connect. — Vlad"
+    char_count: 218
+  - persona: "advocate (Bob Stevens, MPS Society UK)"
+    rendered: "Hi Bob — your MPS Society advocacy on rare-disease EA pathways is what got me here. I'm working on access navigation for patients with limited options and would love to learn from your approach. — Vlad"
+    char_count: 213
