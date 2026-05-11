@@ -103,11 +103,7 @@ schema:
     - outreach_sent
 
   custom_fields:
-    # Renamed from the original session's `ea_relation` to the generic name.
-    - name: domain_relation
-      type: string
-      description: "One sentence summarizing this person's connection to oncology EA/CU."
-
+    # domain_relation lives in core_fields; custom fields below extend the core schema.
     - name: category
       type: enum
       values:
@@ -201,6 +197,23 @@ external_data:
       - city
       - state
       - specialty
+
+# ---- social enrichment ------------------------------------------------------
+# Build phase 2f spawns the social-enricher agent for each channel here.
+# Requires a logged-in browser session via the /browser skill and a cookie
+# jar path. The agent uses multi-signal scoring (name + institution + field +
+# mutual connections) and stops every audit.checkpoint_interval leads.
+social_channels:
+  - channel: linkedin
+    session_cookie_path: "~/.config/lead-ops/linkedin-cookies.json"
+    fields:
+      - linkedin_url
+      - linkedin_about
+      - linkedin_connection
+      - mutual_connections
+      - linkedin_followers
+      - linkedin_connections
+    min_signals_required: 2           # name + (institution OR field) minimum
 
 # ---- outreach ---------------------------------------------------------------
 outreach:

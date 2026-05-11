@@ -104,3 +104,22 @@ def discover(scope: dict[str, Any], params: dict[str, Any]) -> list[dict[str, An
         for cand in _scrape_page(page, use_jina, timeout):
             out.setdefault(cand["url"], cand)
     return list(out.values())
+
+
+def _main() -> int:
+    """CLI entry: `python -m <module> --scope <json> --params <json>` prints JSON to stdout."""
+    import argparse
+    import json
+    import sys
+    parser = argparse.ArgumentParser(description="Run web_scrape discover() and print candidates as JSON.")
+    parser.add_argument("--scope", default="{}", help="JSON-encoded scope dict")
+    parser.add_argument("--params", required=True, help="JSON-encoded params dict")
+    args = parser.parse_args()
+    candidates = discover(json.loads(args.scope), json.loads(args.params))
+    json.dump(candidates, sys.stdout, ensure_ascii=False)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

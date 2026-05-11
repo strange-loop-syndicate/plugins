@@ -68,6 +68,19 @@ working_surface:
 # Optional. CSV / XLSX / JSON files the external-cross-ref agent can pull from.
 external_data: []
 
+# ---- social enrichment ------------------------------------------------------
+# Optional. If set, build phase 2f spawns the social-enricher agent against
+# each channel here. Omit (or leave empty) to skip social enrichment.
+# Each entry: {channel, session_cookie_path, fields, min_signals_required}.
+social_channels: []
+# Example:
+# social_channels:
+#   - channel: linkedin
+#     session_cookie_path: "~/.config/lead-ops/linkedin-cookies.json"
+#     fields: [linkedin_url, headline, location, connection_degree,
+#              mutual_connections, followers, about]
+#     min_signals_required: 2          # name + institution OR name + field
+
 # ---- outreach ---------------------------------------------------------------
 # Paste blocks from templates/channels/<channel>.yaml or reference by id only
 # (the build skill loads defaults from the plugin templates dir).
